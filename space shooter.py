@@ -59,6 +59,7 @@ class Spaceship(pg.sprite.Sprite):
             a.anim()
             if self.health<=0:
                 self.die=True
+                running=False
 
     #death animation
     def crash(self):
@@ -135,6 +136,8 @@ class Alien(pg.sprite.Sprite):
             else:
                 self.die=True
             b.kill()
+        for _ in pg.sprite.spritecollide(self,player,False):
+            self.die=True
     
     #push back animation
     def push(self):
