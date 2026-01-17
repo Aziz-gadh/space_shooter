@@ -40,19 +40,19 @@ class Spaceship(pg.sprite.Sprite):
     #input method
     def input(self):
         keys=pg.key.get_pressed()
-        if keys[pg.K_LEFT] and self.rect1.left>-40 and not self.die:
+        if keys[pg.K_LEFT] and self.rect1.left>-40 and not self.die and cross<3:
             self.rect.x -= vel_pl
             self.rect1.x -= vel_pl
-        if keys[pg.K_RIGHT] and self.rect1.right<width+40 and not self.die:
+        if keys[pg.K_RIGHT] and self.rect1.right<width+40 and not self.die and cross<3:
             self.rect.x += vel_pl
             self.rect1.x += vel_pl
-        if keys[pg.K_UP] and self.rect1.top>0 and not self.die:
+        if keys[pg.K_UP] and self.rect1.top>0 and not self.die and cross<3:
             self.rect.y -= vel_pl
             self.rect1.y -= vel_pl
-        if keys[pg.K_DOWN] and self.rect1.bottom<height and not self.die:
+        if keys[pg.K_DOWN] and self.rect1.bottom<height and not self.die and cross<3:
             self.rect.y += vel_pl
             self.rect1.y += vel_pl
-        if keys[pg.K_SPACE] and self.cool_down<=0 and not self.die:
+        if keys[pg.K_SPACE] and self.cool_down<=0 and not self.die and cross<3:
             bullets.add(Bullet())
             self.cool_down=1
 
@@ -69,7 +69,7 @@ class Spaceship(pg.sprite.Sprite):
     #death animation
     def anim(self):
         global running
-        if self.die or score==3:
+        if self.die or cross==3:
             if self.w<=0:
                 self.frames=[pg.image.load("Graphics/explosion1.png").convert(),pg.image.load("Graphics/explosion2.png").convert()]
                 self.frames=[pg.transform.scale(x,(self.rect1.width,self.rect1.width*1.2)) for x in self.frames]
