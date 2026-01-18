@@ -53,10 +53,10 @@ class Spaceship(pg.sprite.Sprite):
     #input method
     def input(self):
         keys=pg.key.get_pressed()
-        if keys[pg.K_LEFT] and self.rect1.left>-40 and not self.die and cross<3:
+        if keys[pg.K_LEFT] and self.rect1.left>-50 and not self.die and cross<3:
             self.rect.x -= vel_pl
             self.rect1.x -= vel_pl
-        if keys[pg.K_RIGHT] and self.rect1.right<width+40 and not self.die and cross<3:
+        if keys[pg.K_RIGHT] and self.rect1.right<width+50 and not self.die and cross<3:
             self.rect.x += vel_pl
             self.rect1.x += vel_pl
         if keys[pg.K_UP] and self.rect1.top>0 and not self.die and cross<3:
@@ -66,7 +66,7 @@ class Spaceship(pg.sprite.Sprite):
             self.rect.y += vel_pl
             self.rect1.y += vel_pl
         if keys[pg.K_SPACE] and self.cool_down<=0 and not self.die and cross<3 :
-            if level==1:
+            if level==2:
                 bullets.add(Bullet(order=0))
             else:
                 bullets.add(Bullet(order=1))
@@ -108,17 +108,20 @@ class Spaceship(pg.sprite.Sprite):
 class Bullet(pg.sprite.Sprite):
     def __init__(self,order):
         super().__init__()
-        self.image = pg.image.load("Graphics/bullet.png").convert()
-        self.image = pg.transform.rotozoom(self.image, -45, 1.5)
-        self.image.set_colorkey(self.image.get_at((0, 0)))
-        if level==1:
-            self.rect = self.image.get_rect(midbottom=player.sprite.rect1.midtop)
         if level==2:
+            self.image = pg.image.load("Graphics/Projectile.png").convert()
+            self.image = pg.transform.rotozoom(self.image,90,0.4)
+            self.rect = self.image.get_rect(midbottom=player.sprite.rect1.midtop)
+            self.damage=60
+        if level==1:
+            self.image = pg.image.load("Graphics/bullet.png").convert()
+            self.image = pg.transform.rotozoom(self.image, -45, 1.5)
             if order==1:
                 self.rect = self.image.get_rect(bottomright=player.sprite.rect1.midtop)
             elif order==2:
                 self.rect = self.image.get_rect(bottomleft=player.sprite.rect1.midtop)
-        self.damage=34
+            self.damage=25
+        self.image.set_colorkey(self.image.get_at((0, 0)))
 
     #input movement method
     def move(self):
@@ -141,11 +144,15 @@ class Alien(pg.sprite.Sprite):
         self.w=0
         self.die=False
         self.pos=pos
-        self.frames=[pg.image.load("Graphics/alien1.png").convert(),pg.image.load("Graphics/alien2.png").convert()]
-        self.frames=[pg.transform.scale(x,((width-70-col_nb*between)//col_nb,int(((width-70-col_nb*between)//col_nb)*1.25))) for x in self.frames]
+        if level==1:
+            self.frames=[pg.image.load("Graphics/alien1.png").convert(),pg.image.load("Graphics/alien2.png").convert()]
+            self.frames=[pg.transform.scale(x,((width-70-col_nb*between)//col_nb,int(((width-70-col_nb*between)//col_nb)*1.25))) for x in self.frames]
+        elif level==2:
+            self.frames=[pg.image.load("Graphics/alien3.png").convert(),pg.image.load("Graphics/alien4.png").convert()]
+            self.frames=[pg.transform.scale(x,((width-70-col_nb*between)//col_nb,int(((width-70-col_nb*between)//col_nb)*1.25))) for x in self.frames]
         for x in self.frames:
             x.set_colorkey(x.get_at((0,0)))
-        self.health=50*(level+1)
+        self.health=75+25*level
         self.image=self.frames[(self.pos+ind)%2]
         self.rect=self.image.get_rect(bottomleft=(self.pos*((width-70-col_nb*between)//col_nb+between)+42,0))
 
@@ -168,8 +175,9 @@ class Alien(pg.sprite.Sprite):
             if self.health>0:
                 self.hit=True
             else:
-                self.die=True
-                score+=1
+                if not self.die:
+                    score+=1
+                self.die = True
         for p in pg.sprite.spritecollide(self,player,False):
             p.health-=20
             boom.add(Boom(self.rect.center))
@@ -191,7 +199,7 @@ class Alien(pg.sprite.Sprite):
         if self.die:
             if not self.w:
                 self.frames=[pg.image.load("Graphics/explosion1.png").convert(),pg.image.load("Graphics/explosion2.png").convert()]
-                self.frames=[pg.transform.scale(x,((width-130-col_nb*between)//col_nb,int(((width-130-col_nb*between)//col_nb)*1.25))) for x in self.frames]
+                self.frames=[pg.transform.scale(x,((width-70-col_nb*between)//col_nb,int(((width-70-col_nb*between)//col_nb)*1.25))) for x in self.frames]
                 for x in self.frames:
                     x.set_colorkey(x.get_at((0,0)))
             self.w+=0.2
@@ -243,7 +251,7 @@ vel_bul=10
 between=50
 col_nb=5
 dt=int((width-70-col_nb*between)//col_nb*20)+100
-vel_al=0.75
+vel_al=1
 ind=0
 aliens=pg.sprite.Group()
 alien_timer_wave=pg.USEREVENT+1
@@ -251,7 +259,7 @@ alien_timer_anim=pg.USEREVENT+2
 pg.time.set_timer(alien_timer_wave,dt)
 pg.time.set_timer(alien_timer_anim,500)
 randomizer1=[x for x in range(0,2**col_nb) if str(bin(x)).count("1")<=4]
-randomizer2=randomizer1+[x for x in range(0,2**col_nb) if str(bin(x)).count("1")==5]
+randomizer2=[x for x in range(0,2**(col_nb+2)) if str(bin(x)).count("1")<=4]+[x for x in range(0,2**(col_nb+2)) if str(bin(x)).count("1")<=3]
 
 #Setting explosion group
 boom=pg.sprite.Group()
@@ -286,14 +294,20 @@ while True:
                 score=0
                 level=1
                 running=True
+                col_nb=5
+                between=50
+                recharge=0.2
+                vel_al=0.75
     screen.blit(background, (0, 0))
     if running:
         if score >= 50 and level == 1:
             for a in aliens:
-                a.anim()
+                a.die=True
             level = 2
-            col_nb = 8
+            col_nb = 7
             between=30
+            recharge=0.15
+            vel_al=0.6
         rhb_rect=pg.rect.Rect(0, height - 20, (width*player.sprite.health)//100, 20)
         bullets.update()
         player.update()
@@ -351,5 +365,5 @@ while True:
     clock.tick(60)
 
 #requirements: sound effects/win conditions
-#extansions: spaceship movement animation/add special attacks/add personal soundtracks/create continuity/add final boss
-#NB: don't forget to push
+#extansions:add special attacks/add personal soundtracks/add final boss
+#Updates: adjusted difficulty shift& bullets' images/differentiated the projectiles between level 1 & 2(recharge & damage)/adjusted the player's movement limits on edges/changed aliens' images between levels
