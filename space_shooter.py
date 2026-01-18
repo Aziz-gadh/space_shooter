@@ -11,6 +11,12 @@ height=width=600
 score=0
 cross=0
 level=1
+game_music=pg.mixer.Sound("Sounds/game_music.mpeg")
+boss_music=pg.mixer.Sound("Sounds/Boss_music.mp3")
+game_music.set_volume(0.4)
+boss_music.set_volume(0.6)
+pl_boss=1
+pl_game=1
 
 #Setting the screen
 screen = pg.display.set_mode((width,height))
@@ -20,8 +26,9 @@ pg.display.set_caption('Space shooter')
 background = pg.image.load("Graphics/background.jpg").convert()
 background = pg.transform.scale(background,(600,600))
 
-#Setting the healthbar rect
+#Setting the healthbars rect
 hb_rect=pg.rect.Rect(0,height-20,width,20)
+bhb_rect=pg.rect.Rect(0,0,width,20)
 
 #adjust the health-bar's color with health
 def set_color(health):
@@ -85,7 +92,7 @@ class Spaceship(pg.sprite.Sprite):
 
     #death animation
     def anim(self):
-        global running,cross,score,level
+        global running,cross,score,level,pl_boss,pl_game
         if self.die or cross>=3:
             if self.w<=0:
                 self.frames=[pg.image.load("Graphics/explosion1.png").convert(),pg.image.load("Graphics/explosion2.png").convert()]
@@ -96,6 +103,12 @@ class Spaceship(pg.sprite.Sprite):
             self.w+=0.01
             if self.w>=1:
                 running=False
+                boss_music.stop()
+                game_music.stop()
+                if pl_boss==0:
+                    pl_boss=1
+                if pl_game==0:
+                    pl_game=1
 
     def update(self):
         self.input()
@@ -161,9 +174,9 @@ class Alien(pg.sprite.Sprite):
             self.image=self.frames[(self.pos+ind)%2]
             self.rect=self.image.get_rect(bottomleft=(self.pos*((width-70-col_nb*between)//col_nb+between)+42,0))
         else:
-            self.health=20000
+            self.health=100000
             self.rect = self.image.get_rect(midbottom=(width//2, 0))
-            self.dir='R'
+        self.dir='R'
 
     #movement method
     def move(self):
@@ -352,14 +365,15 @@ while True:
                 ind = 1 - ind
         else:
             #starting or restarting
-            if event.type==pg.KEYUP and event.key==pg.K_SPACE:
+            if event.type==pg.KEYUP and event.key==pg.K_RETURN:
                 player.sprite.__init__()
+                boss.empty()
                 boom.empty()
                 aliens.empty()
                 bullets.empty()
                 cross= 0
-                score=120
-                level=2
+                score=0
+                level=1
                 running=True
                 col_nb=5
                 between=50
@@ -367,6 +381,18 @@ while True:
                 vel_al=0.75
     screen.blit(background, (0, 0))
     if running:
+        rhb_rect=pg.rect.Rect(0, height - 20, (width*player.sprite.health)//100, 20)
+        bullets.update()
+        boss.update()
+        player.update()
+        aliens.update()
+        aliens.draw(screen)
+        boss.draw(screen)
+        boom.update()
+        if level==3:
+            pg.draw.rect(screen, '#888888', bhb_rect)
+            brhb_rect = pg.rect.Rect(0,0, (width * boss.sprite.health) // 100000, 20)
+            pg.draw.rect(screen, set_color(boss.sprite.health//1000), brhb_rect)
         if score >= 50 and level == 1:
             for a in aliens:
                 a.die=True
@@ -383,34 +409,36 @@ while True:
             recharge=0.3
             vel_al=3
             boss.add(Alien(pos=0))
+            game_music.stop()
+            boss_music.play(-1)
+            pl_boss=0
+            pl_game=1
         if score>120 and level==3:
             running=False
-        rhb_rect=pg.rect.Rect(0, height - 20, (width*player.sprite.health)//100, 20)
-        bullets.update()
-        boss.update()
-        player.update()
-        aliens.update()
-        boom.update()
-        aliens.draw(screen)
-        boss.draw(screen)
-        if cross>0:
+            boss_music.stop()
+            pl_boss=1
+        if level!=3 and pl_game!=0 and running:
+            game_music.play(-1)
+            pl_game=0
+        if cross>0 and level!=3:
             pg.draw.circle(screen,'#ff0000',(30,30),20)
-        if cross>1:
+        if cross>1 and level!=3:
             pg.draw.circle(screen,'#ff0000',(80,30),20)
-        if cross>2:
+        if cross>2 and level!=3:
             pg.draw.circle(screen,'#ff0000',(130,30),20)
         pg.draw.rect(screen,'#888888',hb_rect)
         pg.draw.rect(screen,set_color(player.sprite.health),rhb_rect)
         bullets.draw(screen)
         boom.draw(screen)
-        score_txt = font.render(f'SCORE: {score}', False, '#ffffff')
-        score_txt=pg.transform.rotozoom(score_txt,0,0.5)
-        score_rect = score_txt.get_rect(topright=(width, 0))
-        level_txt = font.render(f'Level: {level}', False, '#ffffff')
-        level_txt=pg.transform.rotozoom(level_txt,0,0.5)
-        level_rect = level_txt.get_rect(topright=(width-score_rect.width-10,0))
-        screen.blit(score_txt, score_rect)
-        screen.blit(level_txt, level_rect)
+        if level!=3:
+            score_txt = font.render(f'SCORE: {score}', False, '#ffffff')
+            score_txt=pg.transform.rotozoom(score_txt,0,0.5)
+            score_rect = score_txt.get_rect(topright=(width, 0))
+            level_txt = font.render(f'Level: {level}', False, '#ffffff')
+            level_txt=pg.transform.rotozoom(level_txt,0,0.5)
+            level_rect = level_txt.get_rect(topright=(width-score_rect.width-10,0))
+            screen.blit(score_txt, score_rect)
+            screen.blit(level_txt, level_rect)
     else:
         #Setting the welcoming message
         welcom_txt = font.render("SPACE SHOOTER", False, '#ffffff')
@@ -420,7 +448,7 @@ while True:
         screen.blit(welcom_txt, txt_rect)
 
         #guide
-        welcom_txt=font.render("Press 'space' to take off!!", False, '#ffffff')
+        welcom_txt=font.render("Press 'enter' to take off!!", False, '#ffffff')
         txt_rect=welcom_txt.get_rect(midbottom=(width//2,height))
         border_txt=pg.rect.Rect(txt_rect.left-6,txt_rect.top-6,txt_rect.width+12,txt_rect.height+10)
         pg.draw.rect(screen,'#0066cc',border_txt)
@@ -431,7 +459,7 @@ while True:
             if score<=120:
                 score_txt = font.render(f'GIT GUD! SCORE: {score}', False, '#ffffff')
             else:
-                score_txt = font.render(f'MISSION ACCOMPLISHED! SCORE: {score}', False, '#ffffff')
+                score_txt = font.render('MISSION ACCOMPLISHED !!', False, '#ffffff')
             score_rect = score_txt.get_rect(midbottom=(width // 2, height - 50))
             border_score = pg.rect.Rect(score_rect.left - 6, score_rect.top - 6, score_rect.width + 12, score_rect.height + 10)
             pg.draw.rect(screen, '#0066cc', border_score)
@@ -445,6 +473,3 @@ while True:
 
     pg.display.update()
     clock.tick(60)
-
-#requirements: sound effects
-#Updates: added a boss+his attacks/added menu feedback/win condition=kill the boss
