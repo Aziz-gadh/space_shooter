@@ -1,6 +1,6 @@
 import pygame as pg
 from sys import exit
-from random import choice
+from random import choice,uniform
 pg.init()
 
 #variables declaration
@@ -123,7 +123,7 @@ class Bullet(pg.sprite.Sprite):
             self.damage=25
         self.image.set_colorkey(self.image.get_at((0, 0)))
 
-    #input movement method
+    #movement method
     def move(self):
         self.rect.y -= vel_bul
 
@@ -152,7 +152,7 @@ class Alien(pg.sprite.Sprite):
             self.frames=[pg.transform.scale(x,((width-70-col_nb*between)//col_nb,int(((width-70-col_nb*between)//col_nb)*1.25))) for x in self.frames]
         else:
             self.image=pg.image.load(f"Graphics/Boss.png").convert()
-            self.image=pg.transform.scale(self.image, (width*0.4,height//2))
+            self.image=pg.transform.scale(self.image, (width*4/15,height//3))
             self.image.set_colorkey(self.image.get_at((0, 0)))
         if level<3:
             for x in self.frames:
@@ -161,13 +161,25 @@ class Alien(pg.sprite.Sprite):
             self.image=self.frames[(self.pos+ind)%2]
             self.rect=self.image.get_rect(bottomleft=(self.pos*((width-70-col_nb*between)//col_nb+between)+42,0))
         else:
-            self.health=1000
+            self.health=20000
             self.rect = self.image.get_rect(midbottom=(width//2, 0))
+            self.dir='R'
 
     #movement method
     def move(self):
-        if level<3 or (level==3 and self.rect.top<20):
+        if level<3 or self.rect.top<20:
             self.rect.y += vel_al
+        else:
+            if self.rect.right<width and self.dir=='R':
+                self.rect.x += vel_al
+            elif self.rect.left>0 and self.dir=='L':
+                self.rect.x -= vel_al
+            elif self.rect.right>=width and self.dir=='R':
+                self.dir='L'
+                self.rect.x -= vel_al
+            elif self.rect.left<=0 and self.dir=='L':
+                self.dir='R'
+                self.rect.x+= vel_al
     
     #aliens out of screen
     def destroy(self):
@@ -189,8 +201,9 @@ class Alien(pg.sprite.Sprite):
                 self.die = True
         for p in pg.sprite.spritecollide(self,player,False):
             p.health-=20
-            boom.add(Boom(self.rect.center))
-            self.kill()
+            if level<3:
+                boom.add(Boom(pos=self.rect.center,side=(width - 130 - col_nb * between) // col_nb))
+                self.kill()
 
     #push back animation
     def push(self):
@@ -226,10 +239,10 @@ class Alien(pg.sprite.Sprite):
 
 #explosion class
 class Boom(pg.sprite.Sprite):
-    def __init__(self,pos):
+    def __init__(self,pos,side):
         super().__init__()
         self.frames = [pg.image.load("Graphics/explosion1.png").convert(), pg.image.load("Graphics/explosion2.png").convert()]
-        self.frames = [pg.transform.scale(x, ((width - 130 - col_nb * between) // col_nb,int(((width - 130 - col_nb * between) // col_nb) * 1.25))) for x in self.frames]
+        self.frames = [pg.transform.scale(x, (side,side * 1.25)) for x in self.frames]
         for x in self.frames:
             x.set_colorkey(x.get_at((0, 0)))
         self.image=self.frames[(pos[0]+ind)%2]
@@ -246,6 +259,37 @@ class Boom(pg.sprite.Sprite):
     def update(self):
         self.image=self.frames[(self.pos[0]+ind)%2]
         self.anim()
+
+#The comet's class
+class Comet(pg.sprite.Sprite):
+    def __init__(self,pos):
+        super().__init__()
+        self.image=pg.image.load("Graphics/comet.png").convert()
+        self.image=pg.transform.rotozoom(self.image,180,3)
+        self.image.set_colorkey(self.image.get_at((0, 0)))
+        self.rect = self.image.get_rect(midtop=(pos,boss.sprite.rect.bottom))
+
+    #movement method
+    def move(self):
+        self.rect.y += vel_com
+
+    #out of screen
+    def destroy(self):
+        if self.rect.top==height-20:
+            self.kill()
+
+    #collision method
+    def damage(self):
+        pg.sprite.spritecollide(self,bullets,True)
+        for p in pg.sprite.spritecollide(self,player,False):
+            p.health-=25
+            boom.add(Boom(pos=self.rect.center,side=self.rect.width))
+            self.kill()
+
+    def update(self):
+        self.move()
+        self.destroy()
+        self.damage()
 
 #initialize spaceship
 player = pg.sprite.GroupSingle()
@@ -266,13 +310,21 @@ ind=0
 aliens=pg.sprite.Group()
 alien_timer_wave=pg.USEREVENT+1
 alien_timer_anim=pg.USEREVENT+2
+alien_timer_att=pg.USEREVENT+3
 pg.time.set_timer(alien_timer_wave,dt)
 pg.time.set_timer(alien_timer_anim,500)
+pg.time.set_timer(alien_timer_att,1000)
 randomizer1=[x for x in range(0,2**col_nb) if str(bin(x)).count("1")<=4]
 randomizer2=[x for x in range(0,2**(col_nb+2)) if str(bin(x)).count("1")<=4]+[x for x in range(0,2**(col_nb+2)) if str(bin(x)).count("1")<=3]
 
 #Setting explosion group
 boom=pg.sprite.Group()
+
+#Setting the comets sprite
+vel_com=3
+
+#Setting the boss Group
+boss=pg.sprite.GroupSingle()
 
 #While loop
 while True:
@@ -292,6 +344,10 @@ while True:
                         if x % 2 == 1:
                             aliens.add(Alien(pos=i))
                         x //= 2
+            if level==3:
+                if event.type==alien_timer_att:
+                    x=uniform(boss.sprite.rect.left, boss.sprite.rect.right)
+                    aliens.add(Comet(pos=x))
             if event.type == alien_timer_anim:
                 ind = 1 - ind
         else:
@@ -302,8 +358,8 @@ while True:
                 aliens.empty()
                 bullets.empty()
                 cross= 0
-                score=0
-                level=1
+                score=120
+                level=2
                 running=True
                 col_nb=5
                 between=50
@@ -325,14 +381,18 @@ while True:
             level=3
             col_nb = 1
             recharge=0.3
-            vel_al=1.5
-            aliens.add(Alien(pos=0))
+            vel_al=3
+            boss.add(Alien(pos=0))
+        if score>120 and level==3:
+            running=False
         rhb_rect=pg.rect.Rect(0, height - 20, (width*player.sprite.health)//100, 20)
         bullets.update()
+        boss.update()
         player.update()
         aliens.update()
         boom.update()
         aliens.draw(screen)
+        boss.draw(screen)
         if cross>0:
             pg.draw.circle(screen,'#ff0000',(30,30),20)
         if cross>1:
@@ -367,8 +427,11 @@ while True:
         screen.blit(welcom_txt, txt_rect)
 
         #score
-        if score>0:
-            score_txt = font.render(f'SCORE: {score}', False, '#ffffff')
+        if score>0 :
+            if score<=120:
+                score_txt = font.render(f'GIT GUD! SCORE: {score}', False, '#ffffff')
+            else:
+                score_txt = font.render(f'MISSION ACCOMPLISHED! SCORE: {score}', False, '#ffffff')
             score_rect = score_txt.get_rect(midbottom=(width // 2, height - 50))
             border_score = pg.rect.Rect(score_rect.left - 6, score_rect.top - 6, score_rect.width + 12, score_rect.height + 10)
             pg.draw.rect(screen, '#0066cc', border_score)
@@ -383,5 +446,5 @@ while True:
     pg.display.update()
     clock.tick(60)
 
-#requirements: sound effects/win conditions
-#extansions:add special attacks/add personal soundtracks/add final boss
+#requirements: sound effects
+#Updates: added a boss+his attacks/added menu feedback/win condition=kill the boss
