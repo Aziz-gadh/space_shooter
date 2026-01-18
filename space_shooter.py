@@ -1,6 +1,6 @@
 import pygame as pg
 from sys import exit
-from random import randint,choice
+from random import choice
 pg.init()
 
 #variables declaration
@@ -10,6 +10,7 @@ font=pg.font.Font("Font/Pixeltype.ttf",72)
 height=width=600
 score=0
 cross=0
+level=1
 
 #Setting the screen
 screen = pg.display.set_mode((width,height))
@@ -19,6 +20,18 @@ pg.display.set_caption('Space shooter')
 background = pg.image.load("Graphics/background.jpg").convert()
 background = pg.transform.scale(background,(600,600))
 
+#Setting the healthbar rect
+hb_rect=pg.rect.Rect(0,height-20,width,20)
+
+#adjust the health-bar's color with health
+def set_color(health):
+    if health>=60:
+        return '#00ff00'
+    elif health>=30:
+        return '#ff8800'
+    else:
+        return '#ff0000'
+
 #the spaceship class
 class Spaceship(pg.sprite.Sprite):
     def __init__(self):
@@ -26,7 +39,7 @@ class Spaceship(pg.sprite.Sprite):
         self.image = pg.image.load("Graphics/spaceship.png").convert()
         self.image = pg.transform.rotozoom(self.image,0,0.75)
         self.image.set_colorkey(self.image.get_at((0,0)))
-        self.rect1 = self.image.get_rect(midbottom=(width/2,height))
+        self.rect1 = self.image.get_rect(midbottom=hb_rect.midtop)
         self.rect=pg.rect.Rect((2*self.rect1.centerx+self.rect1.left)//3,(2*self.rect1.centery+self.rect1.top)//3,self.rect1.width//3,self.rect1.height//3)
         self.health=100
         self.die=False
@@ -49,11 +62,15 @@ class Spaceship(pg.sprite.Sprite):
         if keys[pg.K_UP] and self.rect1.top>0 and not self.die and cross<3:
             self.rect.y -= vel_pl
             self.rect1.y -= vel_pl
-        if keys[pg.K_DOWN] and self.rect1.bottom<height and not self.die and cross<3:
+        if keys[pg.K_DOWN] and self.rect1.bottom<height-20 and not self.die and cross<3:
             self.rect.y += vel_pl
             self.rect1.y += vel_pl
-        if keys[pg.K_SPACE] and self.cool_down<=0 and not self.die and cross<3:
-            bullets.add(Bullet())
+        if keys[pg.K_SPACE] and self.cool_down<=0 and not self.die and cross<3 :
+            if level==1:
+                bullets.add(Bullet(order=0))
+            else:
+                bullets.add(Bullet(order=1))
+                bullets.add(Bullet(order=2 ))
             self.cool_down=1
 
     #cool down configuration
@@ -68,8 +85,8 @@ class Spaceship(pg.sprite.Sprite):
 
     #death animation
     def anim(self):
-        global running
-        if self.die or cross==3:
+        global running,cross,score,level
+        if self.die or cross>=3:
             if self.w<=0:
                 self.frames=[pg.image.load("Graphics/explosion1.png").convert(),pg.image.load("Graphics/explosion2.png").convert()]
                 self.frames=[pg.transform.scale(x,(self.rect1.width,self.rect1.width*1.2)) for x in self.frames]
@@ -79,10 +96,6 @@ class Spaceship(pg.sprite.Sprite):
             self.w+=0.01
             if self.w>=1:
                 running=False
-                self.__init__()
-                boom.empty()
-                aliens.empty()
-                bullets.empty()
 
     def update(self):
         self.input()
@@ -93,12 +106,19 @@ class Spaceship(pg.sprite.Sprite):
 
 #The bullets class
 class Bullet(pg.sprite.Sprite):
-    def __init__(self):
+    def __init__(self,order):
         super().__init__()
         self.image = pg.image.load("Graphics/bullet.png").convert()
         self.image = pg.transform.rotozoom(self.image, -45, 1.5)
         self.image.set_colorkey(self.image.get_at((0, 0)))
-        self.rect = self.image.get_rect(midbottom=player.sprite.rect1.midtop)
+        if level==1:
+            self.rect = self.image.get_rect(midbottom=player.sprite.rect1.midtop)
+        if level==2:
+            if order==1:
+                self.rect = self.image.get_rect(bottomright=player.sprite.rect1.midtop)
+            elif order==2:
+                self.rect = self.image.get_rect(bottomleft=player.sprite.rect1.midtop)
+        self.damage=34
 
     #input movement method
     def move(self):
@@ -125,7 +145,7 @@ class Alien(pg.sprite.Sprite):
         self.frames=[pg.transform.scale(x,((width-70-col_nb*between)//col_nb,int(((width-70-col_nb*between)//col_nb)*1.25))) for x in self.frames]
         for x in self.frames:
             x.set_colorkey(x.get_at((0,0)))
-        self.health=100
+        self.health=50*(level+1)
         self.image=self.frames[(self.pos+ind)%2]
         self.rect=self.image.get_rect(bottomleft=(self.pos*((width-70-col_nb*between)//col_nb+between)+42,0))
 
@@ -136,15 +156,15 @@ class Alien(pg.sprite.Sprite):
     #aliens out of screen
     def destroy(self):
         global cross
-        if self.rect.top==height:
+        if self.rect.top==height-20:
             cross+=1
             self.kill()
 
     #collision with bullets/the player
     def damage(self):
         global score
-        for _ in pg.sprite.spritecollide(self,bullets,True):
-            self.health-=20
+        for b in pg.sprite.spritecollide(self,bullets,True):
+            self.health-=b.damage
             if self.health>0:
                 self.hit=True
             else:
@@ -177,7 +197,7 @@ class Alien(pg.sprite.Sprite):
             self.w+=0.2
             if self.w==1:
                 self.kill()
-        
+
     def update(self):
         self.image=self.frames[(self.pos+ind)%2]
         self.move()
@@ -230,6 +250,8 @@ alien_timer_wave=pg.USEREVENT+1
 alien_timer_anim=pg.USEREVENT+2
 pg.time.set_timer(alien_timer_wave,dt)
 pg.time.set_timer(alien_timer_anim,500)
+randomizer1=[x for x in range(0,2**col_nb) if str(bin(x)).count("1")<=4]
+randomizer2=randomizer1+[x for x in range(0,2**col_nb) if str(bin(x)).count("1")==5]
 
 #Setting explosion group
 boom=pg.sprite.Group()
@@ -241,40 +263,69 @@ while True:
         if event.type == pg.QUIT or (event.type==pg.KEYDOWN and event.key == pg.K_ESCAPE):
             pg.quit()
             exit()
-        if running:
+        if running :
             if event.type==alien_timer_wave:
-                x=randint(0,2**col_nb)
+                if level==1:
+                    x=choice(randomizer1)
+                elif level==2:
+                    x=choice(randomizer2)
                 for i in range(col_nb):
-                    if x%2==1:
+                    if x % 2 == 1:
                         aliens.add(Alien(pos=i))
-                    x//=2
-            if event.type==alien_timer_anim:
-                ind=1-ind
+                    x //= 2
+            if event.type == alien_timer_anim:
+                ind = 1 - ind
         else:
             #starting or restarting
             if event.type==pg.KEYUP and event.key==pg.K_SPACE:
+                player.sprite.__init__()
+                boom.empty()
+                aliens.empty()
+                bullets.empty()
+                cross= 0
+                score=0
+                level=1
                 running=True
     screen.blit(background, (0, 0))
     if running:
+        if score >= 50 and level == 1:
+            for a in aliens:
+                a.anim()
+            level = 2
+            col_nb = 8
+            between=30
+        rhb_rect=pg.rect.Rect(0, height - 20, (width*player.sprite.health)//100, 20)
         bullets.update()
         player.update()
         aliens.update()
         boom.update()
-        bullets.draw(screen)
         aliens.draw(screen)
+        if cross>0:
+            pg.draw.circle(screen,'#ff0000',(30,30),20)
+        if cross>1:
+            pg.draw.circle(screen,'#ff0000',(80,30),20)
+        if cross>2:
+            pg.draw.circle(screen,'#ff0000',(130,30),20)
+        pg.draw.rect(screen,'#888888',hb_rect)
+        pg.draw.rect(screen,set_color(player.sprite.health),rhb_rect)
+        bullets.draw(screen)
         boom.draw(screen)
         score_txt = font.render(f'SCORE: {score}', False, '#ffffff')
         score_txt=pg.transform.rotozoom(score_txt,0,0.5)
-        score_rect = score_txt.get_rect(topright=(width,0))
+        score_rect = score_txt.get_rect(topright=(width, 0))
+        level_txt = font.render(f'Level: {level}', False, '#ffffff')
+        level_txt=pg.transform.rotozoom(level_txt,0,0.5)
+        level_rect = level_txt.get_rect(topright=(width-score_rect.width-10,0))
         screen.blit(score_txt, score_rect)
+        screen.blit(level_txt, level_rect)
     else:
         #Setting the welcoming message
-        welcom_txt=font.render("SPACE SHOOTER", False, '#ffffff')
-        txt_rect=welcom_txt.get_rect(midtop=(width//2,50))
-        border=pg.rect.Rect(txt_rect.left-6,txt_rect.top-6,txt_rect.width+12,txt_rect.height+10)
+        welcom_txt = font.render("SPACE SHOOTER", False, '#ffffff')
+        txt_rect = welcom_txt.get_rect(midtop=(width // 2, 50))
+        border = pg.rect.Rect(txt_rect.left - 6, txt_rect.top - 6, txt_rect.width + 12, txt_rect.height + 10)
         pg.draw.rect(screen,'#0066cc',border)
         screen.blit(welcom_txt, txt_rect)
-        
+
         #guide
         welcom_txt=font.render("Press 'space' to take off!!", False, '#ffffff')
         txt_rect=welcom_txt.get_rect(midbottom=(width//2,height))
@@ -291,12 +342,14 @@ while True:
             screen.blit(score_txt, score_rect)
 
         #logo
-        logo=pg.image.load('Graphics/logo.png').convert()
-        logo=pg.transform.rotozoom(logo,0,0.65)
+        logo = pg.image.load('Graphics/logo.png').convert()
+        logo = pg.transform.rotozoom(logo, 0, 0.65)
         logo.set_colorkey(logo.get_at((0, 0)))
         screen.blit(logo,logo.get_rect(center=(width//2,height//2)))
 
     pg.display.update()
     clock.tick(60)
-#requirements: health bar/ sound effects/win-lose conditions
-#extansions: spaceship movement animation/accord timer to aliens' size/add special attacks/add personal soundtracks/create continuity/add levels
+
+#requirements: sound effects/win conditions
+#extansions: spaceship movement animation/add special attacks/add personal soundtracks/create continuity/add final boss
+#NB: don't forget to push
