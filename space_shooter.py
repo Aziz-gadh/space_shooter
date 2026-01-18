@@ -108,7 +108,7 @@ class Spaceship(pg.sprite.Sprite):
 class Bullet(pg.sprite.Sprite):
     def __init__(self,order):
         super().__init__()
-        if level==2:
+        if level>=2:
             self.image = pg.image.load("Graphics/Projectile.png").convert()
             self.image = pg.transform.rotozoom(self.image,90,0.4)
             self.rect = self.image.get_rect(midbottom=player.sprite.rect1.midtop)
@@ -146,19 +146,28 @@ class Alien(pg.sprite.Sprite):
         self.pos=pos
         if level==1:
             self.frames=[pg.image.load("Graphics/alien1.png").convert(),pg.image.load("Graphics/alien2.png").convert()]
-            self.frames=[pg.transform.scale(x,((width-70-col_nb*between)//col_nb,int(((width-70-col_nb*between)//col_nb)*1.25))) for x in self.frames]
+            self.frames=[pg.transform.scale(x,((width-70-col_nb*between)//col_nb,((width-70-col_nb*between)//col_nb)*1.25)) for x in self.frames]
         elif level==2:
             self.frames=[pg.image.load("Graphics/alien3.png").convert(),pg.image.load("Graphics/alien4.png").convert()]
             self.frames=[pg.transform.scale(x,((width-70-col_nb*between)//col_nb,int(((width-70-col_nb*between)//col_nb)*1.25))) for x in self.frames]
-        for x in self.frames:
-            x.set_colorkey(x.get_at((0,0)))
-        self.health=75+25*level
-        self.image=self.frames[(self.pos+ind)%2]
-        self.rect=self.image.get_rect(bottomleft=(self.pos*((width-70-col_nb*between)//col_nb+between)+42,0))
+        else:
+            self.image=pg.image.load(f"Graphics/Boss.png").convert()
+            self.image=pg.transform.scale(self.image, (width*0.4,height//2))
+            self.image.set_colorkey(self.image.get_at((0, 0)))
+        if level<3:
+            for x in self.frames:
+                x.set_colorkey(x.get_at((0, 0)))
+            self.health=75+25*level
+            self.image=self.frames[(self.pos+ind)%2]
+            self.rect=self.image.get_rect(bottomleft=(self.pos*((width-70-col_nb*between)//col_nb+between)+42,0))
+        else:
+            self.health=1000
+            self.rect = self.image.get_rect(midbottom=(width//2, 0))
 
     #movement method
     def move(self):
-        self.rect.y += vel_al
+        if level<3 or (level==3 and self.rect.top<20):
+            self.rect.y += vel_al
     
     #aliens out of screen
     def destroy(self):
@@ -207,7 +216,8 @@ class Alien(pg.sprite.Sprite):
                 self.kill()
 
     def update(self):
-        self.image=self.frames[(self.pos+ind)%2]
+        if level<3:
+            self.image=self.frames[(self.pos+ind)%2]
         self.move()
         self.destroy()
         self.damage()
@@ -273,14 +283,15 @@ while True:
             exit()
         if running :
             if event.type==alien_timer_wave:
-                if level==1:
-                    x=choice(randomizer1)
-                elif level==2:
-                    x=choice(randomizer2)
-                for i in range(col_nb):
-                    if x % 2 == 1:
-                        aliens.add(Alien(pos=i))
-                    x //= 2
+                if level<3:
+                    if level==1:
+                        x=choice(randomizer1)
+                    elif level==2:
+                        x=choice(randomizer2)
+                    for i in range(col_nb):
+                        if x % 2 == 1:
+                            aliens.add(Alien(pos=i))
+                        x //= 2
             if event.type == alien_timer_anim:
                 ind = 1 - ind
         else:
@@ -308,6 +319,14 @@ while True:
             between=30
             recharge=0.15
             vel_al=0.6
+        if score>=120 and level==2:
+            for a in aliens:
+                a.die=True
+            level=3
+            col_nb = 1
+            recharge=0.3
+            vel_al=1.5
+            aliens.add(Alien(pos=0))
         rhb_rect=pg.rect.Rect(0, height - 20, (width*player.sprite.health)//100, 20)
         bullets.update()
         player.update()
@@ -366,4 +385,3 @@ while True:
 
 #requirements: sound effects/win conditions
 #extansions:add special attacks/add personal soundtracks/add final boss
-#Updates: adjusted difficulty shift& bullets' images/differentiated the projectiles between level 1 & 2(recharge & damage)/adjusted the player's movement limits on edges/changed aliens' images between levels
